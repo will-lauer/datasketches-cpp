@@ -136,18 +136,23 @@ uint64_t theta_update_sketch_base<EN, EK, A>::hash_and_screen(const void* data, 
 
 template<typename EN, typename EK, typename A>
 auto theta_update_sketch_base<EN, EK, A>::find(uint64_t key) const -> std::pair<iterator, bool> {
-  const size_t size = 1 << lg_cur_size_;
+  return find(entries_, lg_cur_size_, key);
+}
+
+template<typename EN, typename EK, typename A>
+auto theta_update_sketch_base<EN, EK, A>::find(EN* entries, uint8_t lg_size, uint64_t key) -> std::pair<iterator, bool> {
+  const size_t size = 1 << lg_size;
   const size_t mask = size - 1;
-  const uint32_t stride = get_stride(key, lg_cur_size_);
+  const uint32_t stride = get_stride(key, lg_size);
   uint32_t index = static_cast<uint32_t>(key) & mask;
   // search for duplicate or zero
   const uint32_t loop_index = index;
   do {
-    const uint64_t probe = EK()(entries_[index]);
+    const uint64_t probe = EK()(entries[index]);
     if (probe == 0) {
-      return std::pair<iterator, bool>(&entries_[index], false);
+      return std::pair<iterator, bool>(&entries[index], false);
     } else if (probe == key) {
-      return std::pair<iterator, bool>(&entries_[index], true);
+      return std::pair<iterator, bool>(&entries[index], true);
     }
     index = (index + stride) & mask;
   } while (index != loop_index);
