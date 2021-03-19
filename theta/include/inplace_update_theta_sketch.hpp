@@ -20,7 +20,7 @@
 #ifndef INPLACE_UPDATE_THETA_SKETCH_HPP_
 #define INPLACE_UPDATE_THETA_SKETCH_HPP_
 
-#include <memory>
+#include <vector>
 
 #include "theta_sketch.hpp"
 
@@ -29,7 +29,7 @@ namespace datasketches {
 /*
  * Updatable Theta sketch that operates in a contiguous region of memory of a fixed size.
  */
-template<typename Allocator = std::allocator<uint64_t>>
+template<typename Buffer = std::vector<char>, typename Allocator = std::allocator<uint64_t>>
 class inplace_update_theta_sketch_alloc {
 public:
   using Entry = uint64_t;
@@ -37,13 +37,13 @@ public:
   using Base = theta_update_sketch_base<Entry, ExtractKey, Allocator>;
   using iterator = theta_iterator<Entry, ExtractKey>;
   using const_iterator = theta_const_iterator<Entry, ExtractKey>;
+  using resize_factor = typename theta_constants::resize_factor;
 
-  static void initialize(char* ptr, uint8_t lg_k, float p = 1, uint64_t seed = DEFAULT_SEED);
+  class builder;
 
-  explicit inplace_update_theta_sketch_alloc(char* ptr);
+  explicit inplace_update_theta_sketch_alloc(Buffer& buffer);
 
-  static size_t size_bytes(uint8_t lg_k);
-  static size_t size_u64(uint8_t lg_k);
+  static size_t max_size_bytes(uint8_t lg_k);
 
   void update(uint64_t value);
   void update(const std::string& value);
@@ -62,14 +62,16 @@ public:
 private:
   struct inplace_update_theta_sketch_state {
     bool is_empty;
-    uint8_t lg_k;
+    uint8_t lg_cur_size;
+    uint8_t lg_nom_size;
+    resize_factor rf;
     uint32_t num_entries;
     uint64_t theta;
     uint64_t seed;
     uint64_t first_entry;
   };
 
-  inplace_update_theta_sketch_state* state;
+  Buffer& buffer;
 
   // offsets are in sizeof(type)
   static const size_t COMPACT_SKETCH_PRE_LONGS_BYTE = 0;
@@ -84,11 +86,25 @@ private:
   static const uint8_t COMPACT_SKETCH_IS_EMPTY_FLAG = 2;
 
   void insert_or_ignore(uint64_t hash);
+  void resize();
   void rebuild();
+
+  static size_t header_size_bytes();
+  static size_t table_size_bytes(uint8_t lg_k);
+
+  // for builder
+  static void initialize(Buffer& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed);
 };
 
-// alias with standard allocator for convenience
-using inplace_update_theta_sketch = inplace_update_theta_sketch_alloc<std::allocator<uint64_t>>;
+template<typename Buffer, typename Allocator>
+class inplace_update_theta_sketch_alloc<Buffer, Allocator>::builder: public theta_base_builder<builder, Allocator> {
+public:
+  builder();
+  void initialize(Buffer& buffer) const;
+};
+
+// alias with default types for convenience
+using inplace_update_theta_sketch = inplace_update_theta_sketch_alloc<>;
 
 } /* namespace datasketches */
 
