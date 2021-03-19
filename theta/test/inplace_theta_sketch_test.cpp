@@ -103,6 +103,16 @@ TEST_CASE("inplace theta sketch: estimation", "[theta_sketch]") {
   REQUIRE(compact_sketch.get_lower_bound(1) < compact_sketch.get_estimate());
   REQUIRE(compact_sketch.get_upper_bound(1) > compact_sketch.get_estimate());
   REQUIRE(compact_sketch.get_num_retained() >= 1 << 12);
+
+  compact_sketch = update_sketch.trim().compact();
+  REQUIRE_FALSE(compact_sketch.is_empty());
+  REQUIRE(compact_sketch.is_ordered());
+  REQUIRE(compact_sketch.is_estimation_mode());
+  REQUIRE(compact_sketch.get_theta() < 1.0);
+  REQUIRE(compact_sketch.get_estimate() == Approx((double) n).margin(n * 0.01));
+  REQUIRE(compact_sketch.get_lower_bound(1) < compact_sketch.get_estimate());
+  REQUIRE(compact_sketch.get_upper_bound(1) > compact_sketch.get_estimate());
+  REQUIRE(compact_sketch.get_num_retained() == 1 << 12);
 }
 
 TEST_CASE("inplace theta sketch: compare with compact sketch in estimation mode from java", "[theta_sketch]") {

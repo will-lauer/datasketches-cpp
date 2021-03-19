@@ -52,6 +52,8 @@ public:
   void merge(const char* ptr);
   void merge_compact(const char* ptr);
 
+  inplace_update_theta_sketch_alloc& trim();
+
   compact_theta_sketch_alloc<Allocator> compact(bool ordered = true, const Allocator& allocator = Allocator()) const;
 
   iterator begin();

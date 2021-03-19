@@ -152,6 +152,13 @@ void inplace_update_theta_sketch_alloc<B, A>::merge_compact(const char* ptr) {
 }
 
 template<typename B, typename A>
+inplace_update_theta_sketch_alloc<B, A>& inplace_update_theta_sketch_alloc<B, A>::trim() {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  if (state->num_entries > static_cast<uint32_t>(1 << state->lg_nom_size)) rebuild();
+  return *this;
+}
+
+template<typename B, typename A>
 compact_theta_sketch_alloc<A> inplace_update_theta_sketch_alloc<B, A>::compact(bool ordered, const A& allocator) const {
   // no trimming for now
   std::vector<uint64_t, A> entries(begin(), end(), A(allocator));
