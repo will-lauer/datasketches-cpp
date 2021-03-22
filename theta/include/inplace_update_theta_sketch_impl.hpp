@@ -160,7 +160,6 @@ inplace_update_theta_sketch_alloc<B, A>& inplace_update_theta_sketch_alloc<B, A>
 
 template<typename B, typename A>
 compact_theta_sketch_alloc<A> inplace_update_theta_sketch_alloc<B, A>::compact(bool ordered, const A& allocator) const {
-  // no trimming for now
   std::vector<uint64_t, A> entries(begin(), end(), A(allocator));
   if (ordered) std::sort(entries.begin(), entries.end());
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
