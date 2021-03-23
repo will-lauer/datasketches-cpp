@@ -49,8 +49,8 @@ public:
   void update(const std::string& value);
   void update(const void* data, size_t length);
 
-  void merge(const char* ptr);
-  void merge_compact(const char* ptr);
+  void merge(const char* ptr, size_t size);
+  void merge_compact(const char* ptr, size_t size);
 
   inplace_update_theta_sketch_alloc& trim();
 

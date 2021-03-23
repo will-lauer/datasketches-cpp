@@ -170,7 +170,7 @@ TEST_CASE("inplace theta sketch: merge exact disjoint", "[theta_sketch]") {
   update_sketch2.update(7);
   update_sketch2.update(8);
 
-  update_sketch1.merge(buf2.data());
+  update_sketch1.merge(buf2.data(), buf2.size());
   auto compact_sketch = update_sketch1.compact();
   REQUIRE_FALSE(compact_sketch.is_empty());
   REQUIRE(compact_sketch.is_ordered());
@@ -199,7 +199,7 @@ TEST_CASE("inplace theta sketch: merge exact half overlap", "[theta_sketch]") {
   update_sketch2.update(5);
   update_sketch2.update(6);
 
-  update_sketch1.merge(buf2.data());
+  update_sketch1.merge(buf2.data(), buf2.size());
   auto compact_sketch = update_sketch1.compact();
   REQUIRE_FALSE(compact_sketch.is_empty());
   REQUIRE(compact_sketch.is_ordered());
@@ -226,7 +226,7 @@ TEST_CASE("inplace theta sketch: merge estimation disjoint", "[theta_sketch]") {
   const int n2 = 16000;
   for (int i = 0; i < n2; ++i) update_sketch2.update(key++);
 
-  update_sketch1.merge(buf2.data());
+  update_sketch1.merge(buf2.data(), buf2.size());
   const int n = n1 + n2;
   auto result = update_sketch1.compact();
 
@@ -256,7 +256,7 @@ TEST_CASE("inplace theta sketch: merge compact estimation disjoint", "[theta_ske
   for (int i = 0; i < n2; ++i) update_sketch2.update(key++);
 
   auto bytes = update_sketch2.compact().serialize();
-  update_sketch1.merge_compact((char*)bytes.data());
+  update_sketch1.merge_compact((char*)bytes.data(), bytes.size());
   const int n = n1 + n2;
   auto result = update_sketch1.compact();
 
@@ -284,7 +284,7 @@ TEST_CASE("inplace theta sketch: merge estimation with overlap", "[theta_sketch]
   const int n2 = 8192;
   for (int i = 0; i < n2; ++i) update_sketch2.update(key++);
 
-  update_sketch1.merge(buf2.data());
+  update_sketch1.merge(buf2.data(), buf2.size());
   const int n = n1 / 2 + n2;
   auto result = update_sketch1.compact();
 
@@ -296,6 +296,8 @@ TEST_CASE("inplace theta sketch: merge estimation with overlap", "[theta_sketch]
   REQUIRE(result.get_lower_bound(1) < result.get_estimate());
   REQUIRE(result.get_upper_bound(1) > result.get_estimate());
   REQUIRE(result.get_num_retained() >= 1 << 12);
+
+  REQUIRE_THROWS_AS(update_sketch1.merge(buf2.data(), buf2.size() - 1), std::invalid_argument);
 }
 
 TEST_CASE("inplace theta sketch: merge compact estimation with overlap", "[theta_sketch]") {
@@ -313,7 +315,7 @@ TEST_CASE("inplace theta sketch: merge compact estimation with overlap", "[theta
   for (int i = 0; i < n2; ++i) update_sketch2.update(key++);
 
   auto bytes = update_sketch2.compact().serialize();
-  update_sketch1.merge_compact((char*)bytes.data());
+  update_sketch1.merge_compact((char*)bytes.data(), bytes.size());
   const int n = n1 / 2 + n2;
   auto result = update_sketch1.compact();
 
@@ -325,6 +327,28 @@ TEST_CASE("inplace theta sketch: merge compact estimation with overlap", "[theta
   REQUIRE(result.get_lower_bound(1) < result.get_estimate());
   REQUIRE(result.get_upper_bound(1) > result.get_estimate());
   REQUIRE(result.get_num_retained() >= 1 << 12);
+
+  REQUIRE_THROWS_AS(update_sketch1.merge_compact((char*)bytes.data(), bytes.size() - 1), std::invalid_argument);
+}
+
+TEST_CASE("inplace theta sketch: merge input too short") {
+  std::vector<char> buf1;
+  inplace_update_theta_sketch::builder().initialize(buf1);
+  auto update_sketch = inplace_update_theta_sketch(buf1);
+  std::vector<char> buf2;
+  REQUIRE_THROWS_AS(update_sketch.merge(buf2.data(), buf2.size()), std::invalid_argument);
+  buf2.resize(8);
+  REQUIRE_THROWS_AS(update_sketch.merge(buf2.data(), buf2.size()), std::invalid_argument);
+}
+
+TEST_CASE("inplace theta sketch: merge compact input too short") {
+  std::vector<char> buf1;
+  inplace_update_theta_sketch::builder().initialize(buf1);
+  auto update_sketch = inplace_update_theta_sketch(buf1);
+  std::vector<char> buf2;
+  REQUIRE_THROWS_AS(update_sketch.merge_compact(buf2.data(), buf2.size()), std::invalid_argument);
+  buf2.resize(8);
+  REQUIRE_THROWS_AS(update_sketch.merge_compact(buf2.data(), buf2.size()), std::invalid_argument);
 }
 
 } /* namespace datasketches */
