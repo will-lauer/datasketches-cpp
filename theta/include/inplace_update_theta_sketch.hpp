@@ -37,7 +37,7 @@ public:
   using Base = theta_update_sketch_base<Entry, ExtractKey, Allocator>;
   using iterator = theta_iterator<Entry, ExtractKey>;
   using const_iterator = theta_const_iterator<Entry, ExtractKey>;
-  using resize_factor = typename theta_constants::resize_factor;
+  using resize_factor = theta_constants::resize_factor;
 
   class builder;
 
@@ -77,6 +77,8 @@ private:
 
   // offsets are in sizeof(type)
   static const size_t COMPACT_SKETCH_PRE_LONGS_BYTE = 0;
+  static const size_t COMPACT_SKETCH_SERIAL_VERSION_BYTE = 1;
+  static const size_t COMPACT_SKETCH_TYPE_BYTE = 2;
   static const size_t COMPACT_SKETCH_FLAGS_BYTE = 5;
   static const size_t COMPACT_SKETCH_SEED_HASH_U16 = 3;
   static const size_t COMPACT_SKETCH_NUM_ENTRIES_U32 = 2;
@@ -86,6 +88,9 @@ private:
   static const size_t COMPACT_SKETCH_ENTRIES_ESTIMATION_U64 = 3;
 
   static const uint8_t COMPACT_SKETCH_IS_EMPTY_FLAG = 2;
+
+  static const uint8_t COMPACT_SKETCH_SERIAL_VERSION = 3;
+  static const uint8_t COMPACT_SKETCH_TYPE = 3;
 
   void insert_or_ignore(uint64_t hash);
   void resize();

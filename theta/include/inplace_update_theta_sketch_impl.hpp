@@ -124,7 +124,8 @@ void inplace_update_theta_sketch_alloc<B, A>::merge(const char* ptr, size_t size
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::merge_compact(const char* ptr, size_t size) {
   if (size < 8) throw std::invalid_argument("at least 8 bytes expected, actual " + std::to_string(size));
-  // TODO: check serial version and sketch type
+  checker<true>::check_serial_version(ptr[COMPACT_SKETCH_SERIAL_VERSION_BYTE], COMPACT_SKETCH_SERIAL_VERSION);
+  checker<true>::check_sketch_type(ptr[COMPACT_SKETCH_TYPE_BYTE], COMPACT_SKETCH_TYPE);
   if (ptr[COMPACT_SKETCH_FLAGS_BYTE] & (1 << COMPACT_SKETCH_IS_EMPTY_FLAG)) return;
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
   const uint16_t other_seed_hash = reinterpret_cast<const uint16_t*>(ptr)[COMPACT_SKETCH_SEED_HASH_U16];
