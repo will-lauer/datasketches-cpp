@@ -161,9 +161,17 @@ void inplace_update_theta_sketch_alloc<B, A>::merge_compact(const char* ptr, siz
     const size_t expected_size_bytes = (entries_start_u64 + num_entries) * sizeof(uint64_t);
     if (size < expected_size_bytes)
       throw std::invalid_argument(std::to_string(expected_size_bytes)
-          + " bytes expected, actual " + std::to_string(size));
+          + " bytes expected, actual " + std::to_string(size) + ", sketch dump: " + hex_dump(ptr, size));
     for (size_t i = 0; i < num_entries; ++i) insert_or_ignore(other_entries[i]);
   }
+}
+
+template<typename B, typename A>
+std::string inplace_update_theta_sketch_alloc<B, A>::hex_dump(const char* ptr, size_t size) {
+  std::stringstream s;
+  s << std::hex << std::setw(2) << std::setfill('0') << std::uppercase;
+  for (size_t i = 0; i < size; ++i) s << static_cast<int>(ptr[i]);
+  return s.str();
 }
 
 template<typename B, typename A>

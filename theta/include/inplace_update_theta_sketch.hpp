@@ -99,6 +99,8 @@ private:
   static size_t header_size_bytes();
   static size_t table_size_bytes(uint8_t lg_k);
 
+  static std::string hex_dump(const char* ptr, size_t size);
+
   // for builder
   static void initialize(Buffer& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed);
 };
