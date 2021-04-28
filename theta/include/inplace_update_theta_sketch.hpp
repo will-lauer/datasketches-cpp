@@ -26,8 +26,11 @@
 
 namespace datasketches {
 
+// forward declaration
+template<typename Buffer, typename Allocator> class inplace_theta_intersection_alloc;
+
 /*
- * Updatable Theta sketch that operates in a contiguous region of memory of a fixed size.
+ * Updatable Theta sketch that operates in a contiguous region of memory represented as std::vector<char>
  */
 template<typename Buffer = std::vector<char>, typename Allocator = std::allocator<uint64_t>>
 class inplace_update_theta_sketch_alloc {
@@ -44,6 +47,10 @@ public:
   explicit inplace_update_theta_sketch_alloc(Buffer& buffer);
 
   static size_t max_size_bytes(uint8_t lg_k);
+
+  bool is_empty() const;
+  uint64_t theta() const;
+  uint32_t num_entries() const;
 
   void update(uint64_t value);
   void update(const std::string& value);
@@ -75,34 +82,23 @@ private:
 
   Buffer& buffer;
 
-  // offsets are in sizeof(type)
-  static const size_t COMPACT_SKETCH_PRE_LONGS_BYTE = 0;
-  static const size_t COMPACT_SKETCH_SERIAL_VERSION_BYTE = 1;
-  static const size_t COMPACT_SKETCH_TYPE_BYTE = 2;
-  static const size_t COMPACT_SKETCH_FLAGS_BYTE = 5;
-  static const size_t COMPACT_SKETCH_SEED_HASH_U16 = 3;
-  static const size_t COMPACT_SKETCH_NUM_ENTRIES_U32 = 2;
-  static const size_t COMPACT_SKETCH_SINGLE_ENTRY_U64 = 1;
-  static const size_t COMPACT_SKETCH_ENTRIES_EXACT_U64 = 2;
-  static const size_t COMPACT_SKETCH_THETA_U64 = 2;
-  static const size_t COMPACT_SKETCH_ENTRIES_ESTIMATION_U64 = 3;
-
-  static const uint8_t COMPACT_SKETCH_IS_EMPTY_FLAG = 2;
-
-  static const uint8_t COMPACT_SKETCH_SERIAL_VERSION = 3;
-  static const uint8_t COMPACT_SKETCH_TYPE = 3;
-
   void insert_or_ignore(uint64_t hash);
   void resize();
   void rebuild();
 
+  uint64_t seed() const;
+
+  void is_empty(bool flag);
+  void theta(uint64_t);
+
+  bool contains(uint64_t key) const;
+
   static size_t header_size_bytes();
   static size_t table_size_bytes(uint8_t lg_k);
 
-  static std::string hex_dump(const char* ptr, size_t size);
-
-  // for builder
-  static void initialize(Buffer& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed);
+  // for builder and intersection
+  friend inplace_theta_intersection_alloc<Buffer, Allocator>;
+  static void initialize(Buffer& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed, bool is_empty);
 };
 
 template<typename Buffer, typename Allocator>

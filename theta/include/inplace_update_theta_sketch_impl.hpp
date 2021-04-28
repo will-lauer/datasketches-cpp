@@ -21,14 +21,15 @@
 #define INPLACE_UPDATE_THETA_SKETCH_IMPL_HPP_
 
 #include "theta_helpers.hpp"
+#include "compact_theta_sketch_interpreter.hpp"
 
 namespace datasketches {
 
 template<typename B, typename A>
-void inplace_update_theta_sketch_alloc<B, A>::initialize(B& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed) {
+void inplace_update_theta_sketch_alloc<B, A>::initialize(B& buffer, uint8_t lg_cur_size, uint8_t lg_nom_size, resize_factor rf, uint64_t theta, uint64_t seed, bool is_empty) {
   buffer.resize(header_size_bytes() + table_size_bytes(lg_cur_size));
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
-  state->is_empty = true;
+  state->is_empty = is_empty;
   state->lg_cur_size = lg_cur_size;
   state->lg_nom_size = lg_nom_size;
   state->rf = rf;
@@ -42,6 +43,48 @@ void inplace_update_theta_sketch_alloc<B, A>::initialize(B& buffer, uint8_t lg_c
 template<typename B, typename A>
 inplace_update_theta_sketch_alloc<B, A>::inplace_update_theta_sketch_alloc(B& buffer):
 buffer(buffer) {}
+
+template<typename B, typename A>
+bool inplace_update_theta_sketch_alloc<B, A>::is_empty() const {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  return state->is_empty;
+}
+
+template<typename B, typename A>
+void inplace_update_theta_sketch_alloc<B, A>::is_empty(bool flag) {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  state->is_empty = flag;
+}
+
+template<typename B, typename A>
+uint64_t inplace_update_theta_sketch_alloc<B, A>::seed() const {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  return state->seed;
+}
+
+template<typename B, typename A>
+uint64_t inplace_update_theta_sketch_alloc<B, A>::theta() const {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  return state->theta;
+}
+
+template<typename B, typename A>
+uint32_t inplace_update_theta_sketch_alloc<B, A>::num_entries() const {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  return state->num_entries;
+}
+
+template<typename B, typename A>
+void inplace_update_theta_sketch_alloc<B, A>::theta(uint64_t theta) {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  state->theta = theta;
+}
+
+template<typename B, typename A>
+bool inplace_update_theta_sketch_alloc<B, A>::contains(uint64_t key) const {
+  auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
+  return Base::find(&state->first_entry, state->lg_cur_size, key).second;
+}
 
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::update(uint64_t value) {
@@ -89,14 +132,12 @@ void inplace_update_theta_sketch_alloc<B, A>::insert_or_ignore(uint64_t hash) {
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::merge(const char* ptr, size_t size) {
   const size_t min_size_bytes = sizeof(inplace_update_theta_sketch_state);
-  if (size < min_size_bytes)
-    throw std::invalid_argument("at least " + std::to_string(min_size_bytes)
-        + " bytes expected, actual " + std::to_string(size));
+  if (size < min_size_bytes) throw std::invalid_argument("at least " + std::to_string(min_size_bytes)
+      + " bytes expected, actual " + std::to_string(size));
   auto other_state = reinterpret_cast<const inplace_update_theta_sketch_state*>(ptr);
   const size_t expected_size_bytes = header_size_bytes() + table_size_bytes(other_state->lg_cur_size);
-  if (size < expected_size_bytes)
-    throw std::invalid_argument(std::to_string(expected_size_bytes)
-        + " bytes expected, actual " + std::to_string(size));
+  if (size < expected_size_bytes) throw std::invalid_argument(std::to_string(expected_size_bytes)
+      + " bytes expected, actual " + std::to_string(size));
   if (other_state->is_empty) return;
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
   if (state->seed != other_state->seed) throw std::invalid_argument("seed mismatch");
@@ -117,61 +158,32 @@ void inplace_update_theta_sketch_alloc<B, A>::merge(const char* ptr, size_t size
     state->num_entries = new_entries.size();
   }
   const Entry* other_entries = &other_state->first_entry;
-  const size_t other_size = 1 << other_state->lg_cur_size;
-  for (size_t i = 0; i < other_size; ++i) if (other_entries[i]) insert_or_ignore(other_entries[i]);
+  const uint32_t other_size = 1 << other_state->lg_cur_size;
+  for (uint32_t i = 0; i < other_size; ++i) if (other_entries[i]) insert_or_ignore(other_entries[i]);
 }
 
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::merge_compact(const char* ptr, size_t size) {
-  if (size < 8) throw std::invalid_argument("at least 8 bytes expected, actual " + std::to_string(size));
-  checker<true>::check_serial_version(ptr[COMPACT_SKETCH_SERIAL_VERSION_BYTE], COMPACT_SKETCH_SERIAL_VERSION);
-  checker<true>::check_sketch_type(ptr[COMPACT_SKETCH_TYPE_BYTE], COMPACT_SKETCH_TYPE);
-  if (ptr[COMPACT_SKETCH_FLAGS_BYTE] & (1 << COMPACT_SKETCH_IS_EMPTY_FLAG)) return;
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
-  const uint16_t other_seed_hash = reinterpret_cast<const uint16_t*>(ptr)[COMPACT_SKETCH_SEED_HASH_U16];
-  checker<true>::check_seed_hash(other_seed_hash, compute_seed_hash(state->seed));
+  auto input_sketch_data = compact_theta_sketch_interpreter<true>::interpret(ptr, size, state->seed);
   state->is_empty = false;
-  const bool other_has_theta = ptr[COMPACT_SKETCH_PRE_LONGS_BYTE] > 2;
-  if (other_has_theta) {
-    if (size < 16) throw std::invalid_argument("at least 16 bytes expected, actual " + std::to_string(size));
-    const uint64_t other_theta = reinterpret_cast<const uint64_t*>(ptr)[COMPACT_SKETCH_THETA_U64];
-    if (state->theta > other_theta) {
-      state->theta = other_theta;
-      // TODO: extract common rebuild code
-      std::vector<uint64_t, A> new_entries;
-      new_entries.reserve(state->num_entries);
-      for (auto entry: *this) {
-        if (entry < state->theta) new_entries.push_back(entry);
-      }
-      Entry* entries = &state->first_entry;
-      std::fill(entries, entries + (1 << state->lg_cur_size), 0);
-      for (auto entry: new_entries) {
-        auto result = Base::find(entries, state->lg_cur_size, entry);
-        if (!result.second) *result.first = entry;
-      }
-      state->num_entries = new_entries.size();
+  if (state->theta > input_sketch_data.theta) {
+    state->theta = input_sketch_data.theta;
+    // TODO: extract common rebuild code
+    std::vector<uint64_t, A> new_entries;
+    new_entries.reserve(state->num_entries);
+    for (auto entry: *this) {
+      if (entry < state->theta) new_entries.push_back(entry);
     }
+    Entry* entries = &state->first_entry;
+    std::fill(entries, entries + (1 << state->lg_cur_size), 0);
+    for (auto entry: new_entries) {
+      auto result = Base::find(entries, state->lg_cur_size, entry);
+      if (!result.second) *result.first = entry;
+    }
+    state->num_entries = new_entries.size();
   }
-  if (ptr[COMPACT_SKETCH_PRE_LONGS_BYTE] == 1) {
-    insert_or_ignore(reinterpret_cast<const uint64_t*>(ptr)[COMPACT_SKETCH_SINGLE_ENTRY_U64]);
-  } else {
-    const size_t num_entries = reinterpret_cast<const uint32_t*>(ptr)[COMPACT_SKETCH_NUM_ENTRIES_U32];
-    const size_t entries_start_u64 = other_has_theta ? COMPACT_SKETCH_ENTRIES_ESTIMATION_U64 : COMPACT_SKETCH_ENTRIES_EXACT_U64;
-    const Entry* other_entries = reinterpret_cast<const uint64_t*>(ptr) + entries_start_u64;
-    const size_t expected_size_bytes = (entries_start_u64 + num_entries) * sizeof(uint64_t);
-    if (size < expected_size_bytes)
-      throw std::invalid_argument(std::to_string(expected_size_bytes)
-          + " bytes expected, actual " + std::to_string(size) + ", sketch dump: " + hex_dump(ptr, size));
-    for (size_t i = 0; i < num_entries; ++i) insert_or_ignore(other_entries[i]);
-  }
-}
-
-template<typename B, typename A>
-std::string inplace_update_theta_sketch_alloc<B, A>::hex_dump(const char* ptr, size_t size) {
-  std::stringstream s;
-  s << std::hex << std::setw(2) << std::setfill('0') << std::uppercase;
-  for (size_t i = 0; i < size; ++i) s << static_cast<int>(ptr[i]);
-  return s.str();
+  for (size_t i = 0; i < input_sketch_data.num_entries; ++i) insert_or_ignore(input_sketch_data.entries[i]);
 }
 
 template<typename B, typename A>
@@ -267,7 +279,7 @@ inplace_update_theta_sketch_alloc<B, A>::builder::builder(): theta_base_builder<
 
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::builder::initialize(B& buffer) const {
-  inplace_update_theta_sketch_alloc::initialize(buffer, this->starting_lg_size(), this->lg_k_, this->rf_, this->starting_theta(), this->seed_);
+  inplace_update_theta_sketch_alloc::initialize(buffer, this->starting_lg_size(), this->lg_k_, this->rf_, this->starting_theta(), this->seed_, true);
 }
 
 } /* namespace datasketches */
