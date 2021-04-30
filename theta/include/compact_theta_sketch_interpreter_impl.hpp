@@ -56,8 +56,8 @@ auto compact_theta_sketch_interpreter<dummy>::interpret(const char* ptr, size_t 
 template<bool dummy>
 std::string compact_theta_sketch_interpreter<dummy>::hex_dump(const char* ptr, size_t size) {
   std::stringstream s;
-  s << std::hex << std::setw(2) << std::setfill('0') << std::uppercase;
-  for (size_t i = 0; i < size; ++i) s << static_cast<int>(ptr[i]);
+  s << std::hex << std::setfill('0') << std::uppercase;
+  for (size_t i = 0; i < size; ++i) s << std::setw(2) << static_cast<int>(ptr[i]);
   return s.str();
 }
 
