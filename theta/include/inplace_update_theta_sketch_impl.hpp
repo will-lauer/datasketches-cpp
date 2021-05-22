@@ -113,7 +113,7 @@ void inplace_update_theta_sketch_alloc<B, A>::update(const void* data, size_t le
 template<typename B, typename A>
 void inplace_update_theta_sketch_alloc<B, A>::insert_or_ignore(uint64_t hash) {
   auto state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
-  if (hash >= state->theta) return; // hash == 0 is reserved to mark empty slots in the table
+  if (hash >= state->theta || hash == 0) return; // hash == 0 is reserved to mark empty slots in the table
   uint64_t* entries = &state->first_entry;
   auto result = Base::find(entries, state->lg_cur_size, hash);
   if (!result.second) {
@@ -151,10 +151,7 @@ void inplace_update_theta_sketch_alloc<B, A>::merge(const char* ptr, size_t size
     }
     Entry* entries = &state->first_entry;
     std::fill(entries, entries + (1 << state->lg_cur_size), 0);
-    for (auto entry: new_entries) {
-      auto result = Base::find(entries, state->lg_cur_size, entry);
-      if (!result.second) *result.first = entry;
-    }
+    for (auto entry: new_entries) *Base::find(entries, state->lg_cur_size, entry).first = entry;
     state->num_entries = new_entries.size();
   }
   const Entry* other_entries = &other_state->first_entry;
@@ -177,10 +174,7 @@ void inplace_update_theta_sketch_alloc<B, A>::merge_compact(const char* ptr, siz
     }
     Entry* entries = &state->first_entry;
     std::fill(entries, entries + (1 << state->lg_cur_size), 0);
-    for (auto entry: new_entries) {
-      auto result = Base::find(entries, state->lg_cur_size, entry);
-      if (!result.second) *result.first = entry;
-    }
+    for (auto entry: new_entries) *Base::find(entries, state->lg_cur_size, entry).first = entry;
     state->num_entries = new_entries.size();
   }
   for (size_t i = 0; i < input_sketch_data.num_entries; ++i) insert_or_ignore(input_sketch_data.entries[i]);
@@ -237,7 +231,7 @@ void inplace_update_theta_sketch_alloc<B, A>::resize() {
   state = reinterpret_cast<inplace_update_theta_sketch_state*>(buffer.data());
   *state = state_copy;
   Entry* entries = &state->first_entry;
-  std::fill(entries, entries + (1 << state->lg_cur_size), 0); // might be excessive
+  std::fill(entries, entries + (1 << state->lg_cur_size), 0);
   for (auto entry: entries_copy) {
     auto result = Base::find(entries, state->lg_cur_size, entry);
     if (!result.second) *result.first = entry;
@@ -253,8 +247,12 @@ void inplace_update_theta_sketch_alloc<B, A>::rebuild() {
   Entry* entries = &state->first_entry;
   std::nth_element(entries, entries + nominal_size + offset, entries + table_size);
   state->theta = entries[nominal_size + offset];
-  std::vector<uint64_t, A> new_entries(entries + offset, entries + nominal_size + offset);
-  std::fill(entries + offset, entries + table_size, 0);
+  std::vector<uint64_t, A> new_entries;
+  new_entries.reserve(nominal_size);
+  for (Entry* it = entries; it < entries + nominal_size + offset; ++it) {
+    if (*it) new_entries.push_back(*it);
+  }
+  std::fill(entries, entries + table_size, 0);
   for (auto entry: new_entries) {
     auto result = Base::find(entries, state->lg_cur_size, entry);
     if (!result.second) *result.first = entry;
