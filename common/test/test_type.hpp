@@ -132,6 +132,12 @@ std::ostream& operator<<(std::ostream& os, const test_type& a) {
   return os;
 }
 
+struct test_type_to_string {
+  std::string operator()(const test_type& a) const {
+    return std::to_string(a.get_value());
+  }
+};
+
 } /* namespace datasketches */
 
 #endif

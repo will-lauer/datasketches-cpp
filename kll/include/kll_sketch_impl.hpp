@@ -22,7 +22,6 @@
 
 #include <iostream>
 #include <iomanip>
-#include <sstream>
 
 #include "memory_operations.hpp"
 #include "kll_helper.hpp"
@@ -1022,54 +1021,57 @@ void kll_sketch<T, C, S, A>::check_family_id(uint8_t family_id) {
 }
 
 template <typename T, typename C, typename S, typename A>
+template<typename ToStr>
 string<A> kll_sketch<T, C, S, A>::to_string(bool print_levels, bool print_items) const {
-  std::basic_ostringstream<char, std::char_traits<char>, AllocChar<A>> os;
-  os << "### KLL sketch summary:" << std::endl;
-  os << "   K              : " << k_ << std::endl;
-  os << "   min K          : " << min_k_ << std::endl;
-  os << "   M              : " << (unsigned int) m_ << std::endl;
-  os << "   N              : " << n_ << std::endl;
-  os << "   Epsilon        : " << std::setprecision(3) << get_normalized_rank_error(false) * 100 << "%" << std::endl;
-  os << "   Epsilon PMF    : " << get_normalized_rank_error(true) * 100 << "%" << std::endl;
-  os << "   Empty          : " << (is_empty() ? "true" : "false") << std::endl;
-  os << "   Estimation mode: " << (is_estimation_mode() ? "true" : "false") << std::endl;
-  os << "   Levels         : " << (unsigned int) num_levels_ << std::endl;
-  os << "   Sorted         : " << (is_level_zero_sorted_ ? "true" : "false") << std::endl;
-  os << "   Capacity items : " << items_size_ << std::endl;
-  os << "   Retained items : " << get_num_retained() << std::endl;
-  os << "   Storage bytes  : " << get_serialized_size_bytes() << std::endl;
+  string<A> str(allocator_);
+  str.append("### KLL sketch summary:\n");
+  str.append("   K              : ").append(std::to_string(k_)).append("\n");
+  str.append("   min K          : ").append(std::to_string(min_k_)).append("\n");
+  str.append("   M              : ").append(std::to_string(m_)).append("\n");
+  str.append("   N              : ").append(std::to_string(n_)).append("\n");
+  str.append("   Epsilon        : ").append(std::to_string(get_normalized_rank_error(false) * 100)).append("%\n");
+  str.append("   Epsilon PMF    : ").append(std::to_string(get_normalized_rank_error(true) * 100)).append("%\n");
+  str.append("   Empty          : ").append(is_empty() ? "true\n" : "false\n");
+  str.append("   Estimation mode: ").append(is_estimation_mode() ? "true\n" : "false\n");
+  str.append("   Levels         : ").append(std::to_string(num_levels_)).append("\n");
+  str.append("   Sorted         : ").append(is_level_zero_sorted_ ? "true\n" : "false\n");
+  str.append("   Capacity items : ").append(std::to_string(items_size_)).append("\n");
+  str.append("   Retained items : ").append(std::to_string(get_num_retained())).append("\n");
+  str.append("   Storage bytes  : ").append(std::to_string(get_serialized_size_bytes())).append("\n");
   if (!is_empty()) {
-    os << "   Min value      : " << *min_value_ << std::endl;
-    os << "   Max value      : " << *max_value_ << std::endl;
+    str.append("   Min value      : ").append(ToStr()(*min_value_)).append("\n");
+    str.append("   Max value      : ").append(ToStr()(*max_value_)).append("\n");
   }
-  os << "### End sketch summary" << std::endl;
+  str.append("### End sketch summary\n");
 
   if (print_levels) {
-    os << "### KLL sketch levels:" << std::endl;
-    os << "   index: nominal capacity, actual size" << std::endl;
+    str.append("### KLL sketch levels:\n");
+    str.append("   index: nominal capacity, actual size\n");
     for (uint8_t i = 0; i < num_levels_; i++) {
-      os << "   " << (unsigned int) i << ": " << kll_helper::level_capacity(k_, num_levels_, i, m_) << ", " << safe_level_size(i) << std::endl;
+      auto level_capacity = kll_helper::level_capacity(k_, num_levels_, i, m_);
+      str.append("   ").append(std::to_string(i)).append(": ").append(std::to_string(level_capacity))
+          .append(", ").append(std::to_string(safe_level_size(i))).append("\n");
     }
-    os << "### End sketch levels" << std::endl;
+    str.append("### End sketch levels\n");
   }
 
   if (print_items) {
-    os << "### KLL sketch data:" << std::endl;
+    str.append("### KLL sketch data:\n");
     uint8_t level = 0;
     while (level < num_levels_) {
       const uint32_t from_index = levels_[level];
       const uint32_t to_index = levels_[level + 1]; // exclusive
       if (from_index < to_index) {
-        os << " level " << (unsigned int) level << ":" << std::endl;
+        str.append(" level ").append(std::to_string(level)).append(":\n");
       }
       for (uint32_t i = from_index; i < to_index; i++) {
-        os << "   " << items_[i] << std::endl;
+        str.append("   ").append(ToStr()(items_[i])).append("\n");
       }
       level++;
     }
-    os << "### End sketch data" << std::endl;
+    str.append("### End sketch data\n");
   }
-  return os.str();
+  return str;
 }
 
 template <typename T, typename C, typename S, typename A>

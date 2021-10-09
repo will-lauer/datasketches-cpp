@@ -466,6 +466,7 @@ class kll_sketch {
      * @param print_levels if true include information about levels
      * @param print_items if true include sketch data
      */
+    template<typename ToStr = ostream_based_to_string<T>>
     string<A> to_string(bool print_levels = false, bool print_items = false) const;
 
     class const_iterator;

@@ -24,6 +24,7 @@
 #include <string>
 #include <memory>
 #include <iostream>
+#include <sstream>
 
 namespace datasketches {
 
@@ -71,6 +72,18 @@ template<typename T>
 static inline void write(std::ostream& os, const T* ptr, size_t size_bytes) {
   os.write(reinterpret_cast<const char*>(ptr), size_bytes);
 }
+
+// Default method of obtaining a string representation of an item.
+// This relies on a global std::ostream& operator<<(std::ostream& os, const T&)
+// for compatibility with previous versions of the library.
+// This may change in the next major version.
+template<typename T> struct ostream_based_to_string {
+  std::string operator()(const T& item) const {
+    std::ostringstream s;
+    s << item;
+    return s.str();
+  }
+};
 
 } // namespace
 
